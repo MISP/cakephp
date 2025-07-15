@@ -162,6 +162,16 @@ class ErrorHandler {
 				$message .= "\nRequest URL: " . $request->here();
 			}
 		}
+		$message .= sprintf(
+				"\nUser %s (User #%s) @ %s",
+				Configure::check('CurrentUserEmail') ? Configure::read('CurrentUserEmail') : 'SYSTEM',
+				Configure::check('CurrentUserId') ? Configure::read('CurrentUserId') : 'SYSTEM',
+				Configure::check('CurrentUserIP') ? Configure::read('CurrentUserIP') : 'SYSTEM'
+		);
+		if (!empty($exception->getFile()) && !empty($exception->getLine())) {
+				$message .= "\nError in: " . $exception->getFile() . ', Line: ' . $exception->getLine();
+		}
+
 		$message .= "\nStack Trace:\n" . $exception->getTraceAsString();
 		return $message;
 	}
@@ -185,6 +195,25 @@ class ErrorHandler {
 				}
 			}
 		}
+		if (Configure::read('MISP.log_errors_ndjson')) {
+			App::uses('JsonLogTool', 'Tools');
+			$jsonLogTool = new JsonLogTool();
+			$message = sprintf("[%s] %s",
+					get_class($exception),
+					$exception->getMessage()
+			);
+			$data = array(
+					'error' => $message,
+					'file' => $exception->getFile(),
+					'line' => $exception->getLine(),
+					'stack_trace' => $exception->getTrace(),
+					'user_id' => Configure::read('CurrentUserId') ?? 'SYSTEM',
+					'user_ip' => Configure::read('CurrentUserIP') ?? 'SYSTEM',
+					'user_email' => Configure::read('CurrentUserEmail') ?? 'SYSTEM'
+			);
+			$jsonLogTool->createLogEntry($data);
+		}
+			
 		return CakeLog::write(LOG_ERR, static::_getMessage($exception));
 	}
 
